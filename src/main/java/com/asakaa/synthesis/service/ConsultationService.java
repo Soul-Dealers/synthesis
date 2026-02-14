@@ -1,0 +1,163 @@
+package com.asakaa.synthesis.service;
+
+import com.asakaa.synthesis.domain.dto.request.ConsultationRequest;
+import com.asakaa.synthesis.domain.dto.request.ConsultationUpdateRequest;
+import com.asakaa.synthesis.domain.dto.response.ConsultationResponse;
+import com.asakaa.synthesis.domain.dto.response.DiagnosisResponse;
+import com.asakaa.synthesis.domain.dto.response.TreatmentResponse;
+import com.asakaa.synthesis.domain.entity.Consultation;
+import com.asakaa.synthesis.domain.entity.ConsultationStatus;
+import com.asakaa.synthesis.domain.entity.Patient;
+import com.asakaa.synthesis.domain.entity.Provider;
+import com.asakaa.synthesis.exception.ResourceNotFoundException;
+import com.asakaa.synthesis.repository.ConsultationRepository;
+import com.asakaa.synthesis.repository.PatientRepository;
+import com.asakaa.synthesis.repository.ProviderRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class ConsultationService {
+
+    private final ConsultationRepository consultationRepository;
+    private final PatientRepository patientRepository;
+    private final ProviderRepository providerRepository;
+
+    @Transactional
+    public ConsultationResponse openConsultation(ConsultationRequest request, Long providerId) {
+        log.info("Opening consultation for patient ID: {} by provider ID: {}", request.getPatientId(), providerId);
+
+        Patient patient = patientRepository.findById(request.getPatientId())
+                .orElseThrow(() -> new ResourceNotFoundException("Patient", request.getPatientId()));
+
+        Provider provider = providerRepository.findById(providerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Provider", providerId));
+
+        Consultation consultation = Consultation.builder()
+                .patient(patient)
+                .provider(provider)
+                .status(ConsultationStatus.OPEN)
+                .chiefComplaint(request.getChiefComplaint())
+                .vitals(request.getVitals())
+                .notes(request.getNotes())
+                .openedAt(LocalDateTime.now())
+                .build();
+
+        consultation = consultationRepository.save(consultation);
+
+        log.info("Consultation opened successfully with ID: {}", consultation.getId());
+        return toResponse(consultation);
+    }
+
+    @Transactional
+    public ConsultationResponse updateConsultation(Long id, ConsultationUpdateRequest request) {
+        log.info("Updating consultation with ID: {}", id);
+
+        Consultation consultation = consultationRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Consultation", id));
+
+        if (request.getVitals() != null) {
+            consultation.setVitals(request.getVitals());
+        }
+        if (request.getNotes() != null) {
+            consultation.setNotes(request.getNotes());
+        }
+        if (request.getStatus() != null) {
+            consultation.setStatus(request.getStatus());
+        }
+
+        consultation = consultationRepository.save(consultation);
+
+        log.info("Consultation updated successfully with ID: {}", consultation.getId());
+        return toResponse(consultation);
+    }
+
+    @Transactional
+    public ConsultationResponse closeConsultation(Long id) {
+        log.info("Closing consultation with ID: {}", id);
+
+        Consultation consultation = consultationRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Consultation", id));
+
+        consultation.setStatus(ConsultationStatus.CLOSED);
+        consultation.setClosedAt(LocalDateTime.now());
+
+        consultation = consultationRepository.save(consultation);
+
+        log.info("Consultation closed successfully with ID: {}", consultation.getId());
+        return toResponse(consultation);
+    }
+
+    public ConsultationResponse getConsultationById(Long id) {
+        log.info("Fetching consultation with ID: {}", id);
+
+        Consultation consultation = consultationRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Consultation", id));
+
+        return toResponse(consultation);
+    }
+
+    public List<ConsultationResponse> getActiveConsultationsByProvider(Long providerId) {
+        log.info("Fetching active consultations for provider ID: {}", providerId);
+
+        List<Consultation> consultations = consultationRepository.findByProviderIdAndStatus(
+                providerId, ConsultationStatus.OPEN);
+
+        return consultations.stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    public List<ConsultationResponse> getConsultationsByPatient(Long patientId) {
+        log.info("Fetching consultations for patient ID: {}", patientId);
+
+        List<Consultation> consultations = consultationRepository.findByPatientId(patientId);
+
+        return consultations.stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    private ConsultationResponse toResponse(Consultation consultation) {
+        return ConsultationResponse.builder()
+                .id(consultation.getId())
+                .patientId(consultation.getPatient().getId())
+                .patientName(consultation.getPatient().getFirstName() + " " + consultation.getPatient().getLastName())
+                .providerId(consultation.getProvider().getId())
+                .providerName(consultation.getProvider().getName())
+                .status(consultation.getStatus())
+                .chiefComplaint(consultation.getChiefComplaint())
+                .vitals(consultation.getVitals())
+                .notes(consultation.getNotes())
+                .openedAt(consultation.getOpenedAt())
+                .closedAt(consultation.getClosedAt())
+                .diagnoses(consultation.getDiagnoses().stream()
+                        .map(diagnosis -> DiagnosisResponse.builder()
+                                .id(diagnosis.getId())
+                                .conditionName(diagnosis.getConditionName())
+                                .confidenceScore(diagnosis.getConfidenceScore())
+                                .reasoning(diagnosis.getReasoning())
+                                .source(diagnosis.getSource())
+                                .treatments(diagnosis.getTreatments().stream()
+                                        .map(treatment -> TreatmentResponse.builder()
+                                                .id(treatment.getId())
+                                                .type(treatment.getType())
+                                                .drugName(treatment.getDrugName())
+                                                .dosage(treatment.getDosage())
+                                                .duration(treatment.getDuration())
+                                                .instructions(treatment.getInstructions())
+                                                .build())
+                                        .collect(Collectors.toList()))
+                                .build())
+                        .collect(Collectors.toList()))
+                .build();
+    }
+}

@@ -24,7 +24,7 @@ spring:
 aws:
   bedrock:
     region: ${AWS_REGION:us-east-1}
-    model-id: ${BEDROCK_MODEL_ID:anthropic.claude-3-sonnet-20240229-v1:0}
+    model-id: ${BEDROCK_MODEL_ID:anthropic.claude-sonnet-4-20250514-v1:0}
   s3:
     bucket: ${S3_BUCKET:synthesis-attachments}
 

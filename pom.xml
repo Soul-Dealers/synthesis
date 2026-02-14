@@ -28,7 +28,7 @@
 	</scm>
 	<properties>
 		<java.version>21</java.version>
-		<aws.sdk.version>2.20.26</aws.sdk.version>
+		<aws.sdk.version>2.41.27</aws.sdk.version>
 		<jjwt.version>0.12.5</jjwt.version>
 	</properties>
 	<dependencies>
@@ -80,12 +80,14 @@
 			<scope>runtime</scope>
 		</dependency>
 
-		<!-- AWS SDK -->
+		<!-- Source: https://mvnrepository.com/artifact/software.amazon.awssdk/bedrockruntime -->
 		<dependency>
 			<groupId>software.amazon.awssdk</groupId>
 			<artifactId>bedrockruntime</artifactId>
 			<version>${aws.sdk.version}</version>
+			<scope>compile</scope>
 		</dependency>
+
 		<dependency>
 			<groupId>software.amazon.awssdk</groupId>
 			<artifactId>s3</artifactId>
