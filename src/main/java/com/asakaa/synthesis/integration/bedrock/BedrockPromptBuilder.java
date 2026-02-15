@@ -64,7 +64,7 @@ public class BedrockPromptBuilder {
                 context.getLocalFormulary() != null ? context.getLocalFormulary() : "WHO Essential Medicines List"
         );
     }
-}
+
 
     public String buildTreatmentPrompt(String condition, com.asakaa.synthesis.domain.dto.request.TreatmentRequest request) {
         String medications = request.getAvailableMedications() != null && !request.getAvailableMedications().isEmpty()
@@ -122,3 +122,4 @@ public class BedrockPromptBuilder {
                 medications
         );
     }
+}

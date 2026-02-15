@@ -71,7 +71,6 @@ public class ResponseParser {
         }
         return result;
     }
-}
 
     public List<com.asakaa.synthesis.domain.dto.response.TreatmentResponse> parseTreatmentResponse(String rawResponse) {
         try {
@@ -106,3 +105,4 @@ public class ResponseParser {
             throw new DiagnosticException("Failed to parse treatment response: " + e.getMessage(), e);
         }
     }
+}

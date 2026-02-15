@@ -30,6 +30,7 @@
 		<java.version>21</java.version>
 		<aws.sdk.version>2.41.27</aws.sdk.version>
 		<jjwt.version>0.12.5</jjwt.version>
+		<flyway.version>11.14.0</flyway.version>
 	</properties>
 	<dependencies>
 		<!-- Spring Boot Starters -->
@@ -59,6 +60,10 @@
 		<dependency>
 			<groupId>org.flywaydb</groupId>
 			<artifactId>flyway-core</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.flywaydb</groupId>
+			<artifactId>flyway-database-postgresql</artifactId>
 		</dependency>
 
 		<!-- JWT -->
@@ -92,6 +97,18 @@
 			<groupId>software.amazon.awssdk</groupId>
 			<artifactId>s3</artifactId>
 			<version>${aws.sdk.version}</version>
+		</dependency>
+
+		<!-- Source: https://mvnrepository.com/artifact/jakarta.validation/jakarta.validation-api -->
+		<dependency>
+			<groupId>jakarta.validation</groupId>
+			<artifactId>jakarta.validation-api</artifactId>
+			<version>4.0.0-M1</version>
+			<scope>compile</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.hibernate.validator</groupId>
+			<artifactId>hibernate-validator</artifactId>
 		</dependency>
 
 		<!-- Utilities -->
