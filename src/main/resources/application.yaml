@@ -21,10 +21,13 @@ spring:
     enabled: true
     baseline-on-migrate: true
 
+server:
+  port: 8081
+
 aws:
   bedrock:
     region: ${AWS_REGION:us-east-1}
-    model-id: ${BEDROCK_MODEL_ID:anthropic.claude-sonnet-4-20250514-v1:0}
+    model-id: ${BEDROCK_MODEL_ID:google.gemma-3-27b-it}
   s3:
     bucket: ${S3_BUCKET:synthesis-attachments}
 

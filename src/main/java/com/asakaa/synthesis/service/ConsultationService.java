@@ -10,9 +10,14 @@ import com.asakaa.synthesis.domain.entity.ConsultationStatus;
 import com.asakaa.synthesis.domain.entity.Patient;
 import com.asakaa.synthesis.domain.entity.Provider;
 import com.asakaa.synthesis.exception.ResourceNotFoundException;
+import com.asakaa.synthesis.exception.ValidationException;
 import com.asakaa.synthesis.repository.ConsultationRepository;
 import com.asakaa.synthesis.repository.PatientRepository;
 import com.asakaa.synthesis.repository.ProviderRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.json.JsonReadFeature;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -29,7 +34,8 @@ public class ConsultationService {
 
     private final ConsultationRepository consultationRepository;
     private final PatientRepository patientRepository;
-    private final ProviderRepository providerRepository;
+        private final ProviderRepository providerRepository;
+        private final ObjectMapper objectMapper;
 
     @Transactional
     public ConsultationResponse openConsultation(ConsultationRequest request, Long providerId) {
@@ -46,7 +52,7 @@ public class ConsultationService {
                 .provider(provider)
                 .status(ConsultationStatus.OPEN)
                 .chiefComplaint(request.getChiefComplaint())
-                .vitals(request.getVitals())
+                .vitals(normalizeVitalsJson(request.getVitals()))
                 .notes(request.getNotes())
                 .openedAt(LocalDateTime.now())
                 .build();
@@ -65,7 +71,7 @@ public class ConsultationService {
                 .orElseThrow(() -> new ResourceNotFoundException("Consultation", id));
 
         if (request.getVitals() != null) {
-            consultation.setVitals(request.getVitals());
+            consultation.setVitals(normalizeVitalsJson(request.getVitals()));
         }
         if (request.getNotes() != null) {
             consultation.setNotes(request.getNotes());
@@ -160,4 +166,23 @@ public class ConsultationService {
                         .collect(Collectors.toList()))
                 .build();
     }
+
+        private String normalizeVitalsJson(String vitals) {
+                if (vitals == null || vitals.isBlank()) {
+                        return null;
+                }
+
+                try {
+                        ObjectMapper mapper = objectMapper.copy();
+                        mapper.enable(JsonReadFeature.ALLOW_SINGLE_QUOTES.mappedFeature());
+                        JsonNode jsonNode = mapper.readTree(vitals);
+                        if (jsonNode.isTextual()) {
+                                String nestedJson = jsonNode.asText();
+                                jsonNode = mapper.readTree(nestedJson);
+                        }
+                        return mapper.writeValueAsString(jsonNode);
+                } catch (JsonProcessingException ex) {
+                        throw new ValidationException("Vitals must be valid JSON.");
+                }
+        }
 }
