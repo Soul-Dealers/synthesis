@@ -14,6 +14,7 @@ import java.util.List;
 @AllArgsConstructor
 public class DifferentialDto {
 
+    private Long id;
     private String condition;
     private BigDecimal confidence;
     private String reasoning;

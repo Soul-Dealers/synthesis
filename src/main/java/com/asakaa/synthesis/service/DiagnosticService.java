@@ -87,6 +87,7 @@ public class DiagnosticService {
                         .source("AI_BEDROCK")
                         .build();
                 diagnosisRepository.save(diagnosis);
+                differential.setId(diagnosis.getId());
                 log.debug("Saved diagnosis: {} with confidence: {}", 
                         differential.getCondition(), differential.getConfidence());
             }

@@ -3,9 +3,9 @@ spring:
     name: synthesis
   
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/synthesis}
-    username: ${DB_USER:synthesis_user}
-    password: ${DB_PASSWORD:changeme}
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/synthesis_db}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:password}
     driver-class-name: org.postgresql.Driver
   
   jpa:
@@ -27,7 +27,7 @@ server:
 aws:
   bedrock:
     region: ${AWS_REGION:us-east-1}
-    model-id: ${BEDROCK_MODEL_ID:google.gemma-3-27b-it}
+    model-id: ${BEDROCK_MODEL_ID:anthropic.claude-3-sonnet-20240229-v1:0}
   s3:
     bucket: ${S3_BUCKET:synthesis-attachments}
 
