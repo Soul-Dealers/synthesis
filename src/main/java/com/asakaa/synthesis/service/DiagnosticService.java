@@ -176,4 +176,112 @@ public class DiagnosticService {
         }
         return "Monitor patient closely and escalate if necessary";
     }
+
+    public com.asakaa.synthesis.domain.dto.response.ImageAnalysisResponse analyzeImage(
+            byte[] imageBytes, String mediaType, String clinicalContext) {
+        log.info("Starting image analysis with media type: {}", mediaType);
+
+        // Validate file type
+        if (!mediaType.equals("image/jpeg") && !mediaType.equals("image/png")) {
+            throw new com.asakaa.synthesis.exception.ValidationException(
+                    "Invalid file type. Only JPEG and PNG images are supported.");
+        }
+
+        // Validate image size (max 5MB)
+        if (imageBytes.length > 5 * 1024 * 1024) {
+            throw new com.asakaa.synthesis.exception.ValidationException(
+                    "Image file is too large. Maximum size is 5MB.");
+        }
+
+        // Build clinical prompt for image analysis
+        String prompt = buildImageAnalysisPrompt(clinicalContext);
+
+        // Invoke Bedrock with vision
+        String rawResponse;
+        try {
+            rawResponse = bedrockClient.invokeVision(imageBytes, mediaType, prompt);
+        } catch (Exception e) {
+            log.error("Failed to analyze image", e);
+            throw new DiagnosticException("Failed to analyze medical image: " + e.getMessage(), e);
+        }
+
+        // Parse response
+        com.asakaa.synthesis.domain.dto.response.ImageAnalysisResponse response = parseImageAnalysisResponse(rawResponse);
+        response.setAnalyzedAt(LocalDateTime.now());
+
+        log.info("Image analysis completed successfully");
+        return response;
+    }
+
+    private String buildImageAnalysisPrompt(String clinicalContext) {
+        StringBuilder prompt = new StringBuilder();
+        prompt.append("You are an expert radiologist and clinical diagnostician. ");
+        prompt.append("Analyze this medical image and provide a detailed clinical assessment.\n\n");
+
+        if (clinicalContext != null && !clinicalContext.trim().isEmpty()) {
+            prompt.append("CLINICAL CONTEXT:\n");
+            prompt.append(clinicalContext).append("\n\n");
+        }
+
+        prompt.append("INSTRUCTIONS:\n");
+        prompt.append("1. Describe what you see in the image in clinical terms\n");
+        prompt.append("2. Identify any abnormalities, lesions, or pathological findings\n");
+        prompt.append("3. Note the quality and technical adequacy of the image\n");
+        prompt.append("4. Provide differential diagnoses based on the imaging findings\n");
+        prompt.append("5. Suggest any additional imaging or tests that may be needed\n\n");
+
+        prompt.append("Return your response as a JSON object with this structure:\n");
+        prompt.append("{\n");
+        prompt.append("  \"description\": \"Detailed description of the image and findings\",\n");
+        prompt.append("  \"findings\": [\"finding1\", \"finding2\", \"finding3\"]\n");
+        prompt.append("}\n\n");
+        prompt.append("Return ONLY the JSON object, no additional text.");
+
+        return prompt.toString();
+    }
+
+    private com.asakaa.synthesis.domain.dto.response.ImageAnalysisResponse parseImageAnalysisResponse(String rawResponse) {
+        try {
+            // Extract JSON from response if it contains markdown code blocks
+            String jsonContent = extractJson(rawResponse);
+
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            com.fasterxml.jackson.databind.JsonNode root = mapper.readTree(jsonContent);
+
+            String description = root.has("description") ? root.get("description").asText() : rawResponse;
+            List<String> findings = new ArrayList<>();
+
+            if (root.has("findings") && root.get("findings").isArray()) {
+                for (com.fasterxml.jackson.databind.JsonNode finding : root.get("findings")) {
+                    findings.add(finding.asText());
+                }
+            }
+
+            return com.asakaa.synthesis.domain.dto.response.ImageAnalysisResponse.builder()
+                    .description(description)
+                    .findings(findings)
+                    .build();
+
+        } catch (Exception e) {
+            log.warn("Failed to parse structured response, returning raw text", e);
+            // Fallback: return raw response as description
+            return com.asakaa.synthesis.domain.dto.response.ImageAnalysisResponse.builder()
+                    .description(rawResponse)
+                    .findings(new ArrayList<>())
+                    .build();
+        }
+    }
+
+    private String extractJson(String rawResponse) {
+        String cleaned = rawResponse.trim();
+        if (cleaned.startsWith("```json")) {
+            cleaned = cleaned.substring(7);
+        } else if (cleaned.startsWith("```")) {
+            cleaned = cleaned.substring(3);
+        }
+        if (cleaned.endsWith("```")) {
+            cleaned = cleaned.substring(0, cleaned.length() - 3);
+        }
+        return cleaned.trim();
+    }
 }
