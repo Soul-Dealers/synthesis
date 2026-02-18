@@ -2,13 +2,11 @@ package com.asakaa.synthesis.service;
 
 import com.asakaa.synthesis.domain.dto.request.EscalationRequest;
 import com.asakaa.synthesis.domain.dto.response.EscalationResponse;
-import com.asakaa.synthesis.domain.entity.Consultation;
-import com.asakaa.synthesis.domain.entity.Diagnosis;
-import com.asakaa.synthesis.domain.entity.Patient;
-import com.asakaa.synthesis.domain.entity.Treatment;
+import com.asakaa.synthesis.domain.entity.*;
 import com.asakaa.synthesis.exception.ResourceNotFoundException;
 import com.asakaa.synthesis.integration.telemedicine.TelemedicineAdapter;
 import com.asakaa.synthesis.repository.ConsultationRepository;
+import com.asakaa.synthesis.repository.EscalationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -17,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.time.Period;
 import java.util.Comparator;
+import java.util.List;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -25,6 +24,7 @@ import java.util.stream.Collectors;
 public class EscalationService {
 
     private final ConsultationRepository consultationRepository;
+    private final EscalationRepository escalationRepository;
     private final TelemedicineAdapter telemedicineAdapter;
     private final NotificationService notificationService;
 
@@ -32,47 +32,75 @@ public class EscalationService {
     public EscalationResponse escalate(EscalationRequest request) {
         log.info("Processing escalation for consultation ID: {}", request.getConsultationId());
 
-        // Fetch consultation with all related data
         Consultation consultation = consultationRepository.findById(request.getConsultationId())
                 .orElseThrow(() -> new ResourceNotFoundException("Consultation", request.getConsultationId()));
 
-        // Build comprehensive case summary
         String caseSummary = buildCaseSummary(consultation, request);
+        String urgency = request.getUrgencyLevel() != null ? request.getUrgencyLevel() : "ROUTINE";
 
-        // Send to telemedicine system
         String referralId = telemedicineAdapter.sendEscalation(
-                caseSummary,
-                request.getUrgencyLevel() != null ? request.getUrgencyLevel() : "ROUTINE",
-                request.getSpecialistType()
-        );
+                caseSummary, urgency, request.getSpecialistType());
 
-        // Send notifications
-        notificationService.notifyEscalation(consultation.getId(), referralId);
-
-        log.info("Escalation completed successfully. Referral ID: {}", referralId);
-
-        // Build response
-        return EscalationResponse.builder()
-                .escalationId(referralId)
-                .consultationId(consultation.getId())
+        // Persist the escalation
+        Escalation escalation = Escalation.builder()
+                .consultation(consultation)
+                .referralId(referralId)
+                .specialistType(request.getSpecialistType())
+                .urgencyLevel(urgency)
                 .status("SUBMITTED")
                 .caseSummary(caseSummary)
+                .referralNotes(request.getReferralNotes())
                 .submittedAt(LocalDateTime.now())
-                .urgencyLevel(request.getUrgencyLevel() != null ? request.getUrgencyLevel() : "ROUTINE")
+                .build();
+        escalation = escalationRepository.save(escalation);
+
+        // Update consultation status
+        consultation.setStatus(ConsultationStatus.ESCALATED);
+        consultationRepository.save(consultation);
+
+        notificationService.notifyEscalation(consultation.getId(), referralId);
+
+        log.info("Escalation completed. Referral ID: {}, Escalation ID: {}", referralId, escalation.getId());
+
+        return toResponse(escalation);
+    }
+
+    public EscalationResponse getEscalationById(Long id) {
+        log.info("Fetching escalation ID: {}", id);
+        Escalation escalation = escalationRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Escalation", id));
+        return toResponse(escalation);
+    }
+
+    public List<EscalationResponse> getEscalationsByConsultation(Long consultationId) {
+        log.info("Fetching escalations for consultation ID: {}", consultationId);
+        return escalationRepository.findByConsultationId(consultationId).stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    private EscalationResponse toResponse(Escalation escalation) {
+        return EscalationResponse.builder()
+                .id(escalation.getId())
+                .escalationId(escalation.getReferralId())
+                .consultationId(escalation.getConsultation().getId())
+                .specialistType(escalation.getSpecialistType())
+                .urgencyLevel(escalation.getUrgencyLevel())
+                .status(escalation.getStatus())
+                .caseSummary(escalation.getCaseSummary())
+                .referralNotes(escalation.getReferralNotes())
+                .submittedAt(escalation.getSubmittedAt())
                 .build();
     }
 
     private String buildCaseSummary(Consultation consultation, EscalationRequest request) {
         Patient patient = consultation.getPatient();
-        
-        // Calculate patient age
         int age = Period.between(patient.getDateOfBirth(), LocalDateTime.now().toLocalDate()).getYears();
 
         StringBuilder summary = new StringBuilder();
-        
-        // Header
+
         summary.append("=== SPECIALIST REFERRAL CASE SUMMARY ===\n\n");
-        
+
         // Patient Demographics
         summary.append("PATIENT INFORMATION:\n");
         summary.append(String.format("- Name: %s %s\n", patient.getFirstName(), patient.getLastName()));
@@ -113,7 +141,7 @@ public class EscalationService {
         if (!consultation.getDiagnoses().isEmpty()) {
             boolean hasTreatments = consultation.getDiagnoses().stream()
                     .anyMatch(d -> !d.getTreatments().isEmpty());
-            
+
             if (hasTreatments) {
                 summary.append("CURRENT TREATMENT PLAN:\n");
                 consultation.getDiagnoses().forEach(diagnosis -> {

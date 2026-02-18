@@ -13,10 +13,13 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class EscalationResponse {
 
+    private Long id;
     private String escalationId;
     private Long consultationId;
+    private String specialistType;
+    private String urgencyLevel;
     private String status;
     private String caseSummary;
+    private String referralNotes;
     private LocalDateTime submittedAt;
-    private String urgencyLevel;
 }
