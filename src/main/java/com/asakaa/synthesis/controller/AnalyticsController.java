@@ -39,4 +39,10 @@ public class AnalyticsController {
         Map<String, Object> response = analyticsService.getClinicSummary(clinicName);
         return ResponseEntity.ok(response);
     }
+
+    @GetMapping("/dashboard")
+    public ResponseEntity<Map<String, Object>> getDashboardSummary() {
+        Map<String, Object> response = analyticsService.getDashboardSummary();
+        return ResponseEntity.ok(response);
+    }
 }

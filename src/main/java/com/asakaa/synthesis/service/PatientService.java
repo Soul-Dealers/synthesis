@@ -67,6 +67,7 @@ public class PatientService {
         patient.setBloodGroup(request.getBloodGroup());
         patient.setAllergies(request.getAllergies());
         patient.setClinicName(request.getClinicName());
+        patient.setRegion(request.getRegion());
 
         patient = patientRepository.save(patient);
 

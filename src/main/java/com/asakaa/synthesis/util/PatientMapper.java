@@ -18,6 +18,7 @@ public class PatientMapper {
                 .bloodGroup(request.getBloodGroup())
                 .allergies(request.getAllergies())
                 .clinicName(request.getClinicName())
+                .region(request.getRegion())
                 .build();
     }
 
@@ -32,6 +33,7 @@ public class PatientMapper {
                 .bloodGroup(patient.getBloodGroup())
                 .allergies(patient.getAllergies())
                 .clinicName(patient.getClinicName())
+                .region(patient.getRegion())
                 .createdAt(patient.getCreatedAt())
                 .build();
     }

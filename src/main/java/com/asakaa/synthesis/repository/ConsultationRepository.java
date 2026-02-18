@@ -19,12 +19,12 @@ public interface ConsultationRepository extends JpaRepository<Consultation, Long
     List<Consultation> findByPatientId(Long patientId);
 
     @Query("""
-            SELECT d.conditionName as condition, p.region as region, COUNT(c.id) as count
+            SELECT d.conditionName as condition, pat.region as region, COUNT(c.id) as count
             FROM Consultation c
-            JOIN c.provider p
+            JOIN c.patient pat
             JOIN c.diagnoses d
             WHERE c.openedAt BETWEEN :startDate AND :endDate
-            GROUP BY d.conditionName, p.region
+            GROUP BY d.conditionName, pat.region
             """)
     List<Map<String, Object>> countByConditionAndRegion(
             @Param("startDate") LocalDateTime startDate,

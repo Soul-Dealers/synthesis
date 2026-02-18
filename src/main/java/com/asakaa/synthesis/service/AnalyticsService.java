@@ -2,9 +2,12 @@ package com.asakaa.synthesis.service;
 
 import com.asakaa.synthesis.domain.dto.response.OutcomeResponse;
 import com.asakaa.synthesis.domain.dto.response.TrendResponse;
+import com.asakaa.synthesis.domain.entity.BaseEntity;
 import com.asakaa.synthesis.domain.entity.ConsultationStatus;
+import com.asakaa.synthesis.domain.entity.Diagnosis;
 import com.asakaa.synthesis.repository.ConsultationRepository;
 import com.asakaa.synthesis.repository.DiagnosisRepository;
+import com.asakaa.synthesis.repository.EscalationRepository;
 import com.asakaa.synthesis.repository.PatientRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -12,7 +15,10 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -22,6 +28,7 @@ public class AnalyticsService {
 
     private final ConsultationRepository consultationRepository;
     private final DiagnosisRepository diagnosisRepository;
+    private final EscalationRepository escalationRepository;
     private final PatientRepository patientRepository;
 
     public List<TrendResponse> getDiseaseTrends(String region, LocalDate from, LocalDate to) {
@@ -33,7 +40,7 @@ public class AnalyticsService {
         List<Map<String, Object>> results = consultationRepository.countByConditionAndRegion(startDate, endDate);
 
         return results.stream()
-                .filter(result -> region == null || region.isEmpty() || 
+                .filter(result -> region == null || region.isEmpty() ||
                         (result.get("region") != null && result.get("region").toString().equalsIgnoreCase(region)))
                 .map(result -> TrendResponse.builder()
                         .condition(result.get("condition") != null ? result.get("condition").toString() : "Unknown")
@@ -47,40 +54,38 @@ public class AnalyticsService {
     public List<OutcomeResponse> getTreatmentOutcomes() {
         log.info("Fetching treatment outcomes");
 
-        // Get all diagnoses grouped by condition
-        List<Object[]> diagnosisStats = diagnosisRepository.findAll().stream()
-                .collect(Collectors.groupingBy(
-                        diagnosis -> diagnosis.getConditionName(),
-                        Collectors.collectingAndThen(
-                                Collectors.toList(),
-                                diagnoses -> new Object[]{
-                                        diagnoses.size(),
-                                        diagnoses.stream()
-                                                .filter(d -> d.getConsultation().getStatus() == ConsultationStatus.CLOSED)
-                                                .count(),
-                                        0L, // Escalated cases - would need escalation tracking table
-                                        diagnoses.stream()
-                                                .filter(d -> d.getConfidenceScore() != null)
-                                                .mapToDouble(d -> d.getConfidenceScore().doubleValue())
-                                                .average()
-                                                .orElse(0.0)
-                                }
-                        )
-                ))
-                .entrySet().stream()
-                .map(entry -> new Object[]{entry.getKey(), entry.getValue()})
-                .toList();
+        List<Diagnosis> allDiagnoses = diagnosisRepository.findAll();
 
-        return diagnosisStats.stream()
-                .map(stat -> {
-                    String condition = (String) stat[0];
-                    Object[] values = (Object[]) stat[1];
+        Map<String, List<Diagnosis>> grouped = allDiagnoses.stream()
+                .collect(Collectors.groupingBy(Diagnosis::getConditionName));
+
+        return grouped.entrySet().stream()
+                .map(entry -> {
+                    String condition = entry.getKey();
+                    List<Diagnosis> diagnoses = entry.getValue();
+
+                    long totalCases = diagnoses.size();
+
+                    long resolvedCases = diagnoses.stream()
+                            .filter(d -> d.getConsultation().getStatus() == ConsultationStatus.CLOSED)
+                            .count();
+
+                    long escalatedCases = diagnoses.stream()
+                            .filter(d -> d.getConsultation().getStatus() == ConsultationStatus.ESCALATED)
+                            .count();
+
+                    double avgConfidence = diagnoses.stream()
+                            .filter(d -> d.getConfidenceScore() != null)
+                            .mapToDouble(d -> d.getConfidenceScore().doubleValue())
+                            .average()
+                            .orElse(0.0);
+
                     return OutcomeResponse.builder()
                             .condition(condition)
-                            .totalCases((Long) values[0])
-                            .resolvedCases((Long) values[1])
-                            .escalatedCases((Long) values[2])
-                            .averageConfidenceScore((Double) values[3])
+                            .totalCases(totalCases)
+                            .resolvedCases(resolvedCases)
+                            .escalatedCases(escalatedCases)
+                            .averageConfidenceScore(avgConfidence)
                             .build();
                 })
                 .sorted(Comparator.comparing(OutcomeResponse::getTotalCases).reversed())
@@ -92,47 +97,85 @@ public class AnalyticsService {
 
         Map<String, Object> summary = new HashMap<>();
 
-        // Total patients
-        long totalPatients = patientRepository.findByClinicName(clinicName).size();
-        summary.put("totalPatients", totalPatients);
-
-        // Total consultations
         List<Long> patientIds = patientRepository.findByClinicName(clinicName).stream()
-                .map(patient -> patient.getId())
-                .collect(Collectors.toList());
+                .map(BaseEntity::getId)
+                .toList();
+
+        summary.put("totalPatients", patientIds.size());
 
         long totalConsultations = 0;
         long activeConsultations = 0;
+        long escalatedConsultations = 0;
         Map<String, Long> conditionCounts = new HashMap<>();
 
         for (Long patientId : patientIds) {
-            List<com.asakaa.synthesis.domain.entity.Consultation> consultations = 
-                    consultationRepository.findByPatientId(patientId);
+            var consultations = consultationRepository.findByPatientId(patientId);
             totalConsultations += consultations.size();
 
             activeConsultations += consultations.stream()
-                    .filter(c -> c.getStatus() == ConsultationStatus.OPEN || 
-                                 c.getStatus() == ConsultationStatus.IN_PROGRESS)
+                    .filter(c -> c.getStatus() == ConsultationStatus.OPEN ||
+                            c.getStatus() == ConsultationStatus.IN_PROGRESS)
                     .count();
 
-            // Count diagnoses
-            consultations.forEach(consultation -> 
-                consultation.getDiagnoses().forEach(diagnosis -> 
-                    conditionCounts.merge(diagnosis.getConditionName(), 1L, Long::sum)
-                )
+            escalatedConsultations += consultations.stream()
+                    .filter(c -> c.getStatus() == ConsultationStatus.ESCALATED)
+                    .count();
+
+            consultations.forEach(consultation ->
+                    consultation.getDiagnoses().forEach(diagnosis ->
+                            conditionCounts.merge(diagnosis.getConditionName(), 1L, Long::sum)
+                    )
             );
         }
 
         summary.put("totalConsultations", totalConsultations);
         summary.put("activeConsultations", activeConsultations);
+        summary.put("escalatedConsultations", escalatedConsultations);
 
-        // Top condition
         String topCondition = conditionCounts.entrySet().stream()
                 .max(Map.Entry.comparingByValue())
                 .map(Map.Entry::getKey)
                 .orElse("None");
         summary.put("topCondition", topCondition);
+        summary.put("conditionBreakdown", conditionCounts);
 
         return summary;
+    }
+
+    public Map<String, Object> getDashboardSummary() {
+        log.info("Fetching dashboard summary");
+
+        Map<String, Object> dashboard = new HashMap<>();
+
+        dashboard.put("totalPatients", patientRepository.count());
+        dashboard.put("totalConsultations", consultationRepository.count());
+        dashboard.put("totalEscalations", escalationRepository.count());
+
+        Map<String, Long> statusCounts = new HashMap<>();
+        for (ConsultationStatus status : ConsultationStatus.values()) {
+            long count = consultationRepository.findAll().stream()
+                    .filter(c -> c.getStatus() == status)
+                    .count();
+            statusCounts.put(status.name(), count);
+        }
+        dashboard.put("consultationsByStatus", statusCounts);
+
+        List<Diagnosis> allDiagnoses = diagnosisRepository.findAll();
+        Map<String, Long> conditionCounts = allDiagnoses.stream()
+                .collect(Collectors.groupingBy(Diagnosis::getConditionName, Collectors.counting()));
+
+        List<Map<String, Object>> topConditions = conditionCounts.entrySet().stream()
+                .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+                .limit(5)
+                .map(entry -> {
+                    Map<String, Object> item = new HashMap<>();
+                    item.put("condition", entry.getKey());
+                    item.put("count", entry.getValue());
+                    return item;
+                })
+                .collect(Collectors.toList());
+        dashboard.put("topConditions", topConditions);
+
+        return dashboard;
     }
 }

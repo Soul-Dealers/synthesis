@@ -23,5 +23,6 @@ public class PatientResponse {
     private String bloodGroup;
     private String allergies;
     private String clinicName;
+    private String region;
     private LocalDateTime createdAt;
 }

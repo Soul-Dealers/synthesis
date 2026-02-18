@@ -1,15 +1,13 @@
 package com.asakaa.synthesis.domain.entity;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
+@EqualsAndHashCode(callSuper = true)
 @Data
 @Builder
 @NoArgsConstructor
@@ -40,6 +38,8 @@ public class Patient extends BaseEntity {
 
     @Column(name = "clinic_name")
     private String clinicName;
+
+    private String region;
 
     @OneToMany(mappedBy = "patient", cascade = CascadeType.ALL)
     @Builder.Default

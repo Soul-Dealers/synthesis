@@ -31,4 +31,5 @@ public class PatientRequest {
     private String bloodGroup;
     private String allergies;
     private String clinicName;
+    private String region;
 }
