@@ -18,5 +18,6 @@ public class DiagnosticResponse {
     private List<DifferentialDto> differentials;
     private List<String> immediateActions;
     private String safetyNotes;
+    private List<String> citations;
     private LocalDateTime generatedAt;
 }

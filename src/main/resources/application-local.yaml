@@ -17,6 +17,7 @@ aws:
   bedrock:
     region: us-east-1
     model-id: anthropic.claude-3-sonnet-20240229-v1:0
+    knowledge-base-id: YOUR_KNOWLEDGE_BASE_ID_HERE
   s3:
     bucket: synthesis-attachments-local
 

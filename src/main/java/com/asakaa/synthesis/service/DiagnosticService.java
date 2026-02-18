@@ -4,6 +4,7 @@ import com.asakaa.synthesis.domain.dto.request.DiagnosticRequest;
 import com.asakaa.synthesis.domain.dto.response.DiagnosticResponse;
 import com.asakaa.synthesis.domain.dto.response.DifferentialDto;
 import com.asakaa.synthesis.domain.dto.response.ImageAnalysisResponse;
+import com.asakaa.synthesis.domain.dto.response.KnowledgeBaseCitation;
 import com.asakaa.synthesis.domain.entity.Consultation;
 import com.asakaa.synthesis.domain.entity.ConsultationStatus;
 import com.asakaa.synthesis.domain.entity.Diagnosis;
@@ -39,6 +40,7 @@ public class DiagnosticService {
     private final BedrockPromptBuilder bedrockPromptBuilder;
     private final BedrockClient bedrockClient;
     private final ResponseParser responseParser;
+    private final KnowledgeBaseService knowledgeBaseService;
     private final ObjectMapper objectMapper;
 
     @Transactional
@@ -52,12 +54,28 @@ public class DiagnosticService {
 
         ClinicalContext context = buildClinicalContext(consultation, patient, request);
 
-        String prompt = bedrockPromptBuilder.buildDiagnosticPrompt(context);
-        log.debug("Generated diagnostic prompt for consultation ID: {}", request.getConsultationId());
+        String queryText = buildKnowledgeBaseQuery(consultation, patient);
+        List<KnowledgeBaseCitation> citations =
+                knowledgeBaseService.queryGuidelines(queryText);
+
+        String basePrompt = bedrockPromptBuilder.buildDiagnosticPrompt(context);
+        String guidelinesContext = knowledgeBaseService.formatCitationsForPrompt(citations);
+        String enhancedPrompt = basePrompt + guidelinesContext;
+
+        if (citations.isEmpty()) {
+            log.warn("No guidelines found, proceeding with general medical knowledge");
+            enhancedPrompt += """
+                    
+                    
+                    NOTE: No specific clinical guidelines were found for this case. \
+                    Base your recommendations on general medical knowledge and best practices.""";
+        }
+
+        log.debug("Generated enhanced diagnostic prompt with {} guideline citations", citations.size());
 
         String rawResponse;
         try {
-            rawResponse = bedrockClient.invoke(prompt);
+            rawResponse = bedrockClient.invoke(enhancedPrompt);
         } catch (Exception e) {
             log.error("Failed to invoke Bedrock for consultation ID: {}", request.getConsultationId(), e);
             throw new DiagnosticException(
@@ -82,7 +100,7 @@ public class DiagnosticService {
                         .conditionName(differential.getCondition())
                         .confidenceScore(differential.getConfidence())
                         .reasoning(differential.getReasoning())
-                        .source("AI_BEDROCK")
+                        .source("AI_BEDROCK_RAG")
                         .build();
                 diagnosisRepository.save(diagnosis);
                 differential.setId(diagnosis.getId());
@@ -94,18 +112,37 @@ public class DiagnosticService {
         consultation.setStatus(ConsultationStatus.IN_PROGRESS);
         consultationRepository.save(consultation);
 
+        List<String> citationReferences = knowledgeBaseService.extractCitationReferences(rawResponse, citations);
+
         DiagnosticResponse response = DiagnosticResponse.builder()
                 .consultationId(consultation.getId())
                 .differentials(differentials)
                 .immediateActions(extractImmediateActions(rawResponse))
                 .safetyNotes(extractSafetyNotes(rawResponse))
+                .citations(citationReferences)
                 .generatedAt(LocalDateTime.now())
                 .build();
 
-        log.info("Diagnostic analysis completed for consultation ID: {} with {} differentials",
-                request.getConsultationId(), differentials.size());
+        log.info("Diagnostic analysis completed for consultation ID: {} with {} differentials and {} citations",
+                request.getConsultationId(), differentials.size(), citationReferences.size());
 
         return response;
+    }
+
+    private String buildKnowledgeBaseQuery(Consultation consultation, Patient patient) {
+        StringBuilder query = new StringBuilder();
+
+        if (consultation.getChiefComplaint() != null) {
+            query.append(consultation.getChiefComplaint());
+        }
+
+        int age = Period.between(patient.getDateOfBirth(), LocalDateTime.now().toLocalDate()).getYears();
+        query.append(" in ").append(age).append(" year old ");
+        query.append(patient.getGender() != null ? patient.getGender().toLowerCase() : "patient");
+
+        query.append(" treatment guidelines");
+
+        return query.toString();
     }
 
     private ClinicalContext buildClinicalContext(Consultation consultation, Patient patient, DiagnosticRequest request) {
