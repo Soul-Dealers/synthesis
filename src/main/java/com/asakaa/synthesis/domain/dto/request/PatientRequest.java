@@ -30,6 +30,7 @@ public class PatientRequest {
     private String gender;
     private String bloodGroup;
     private String allergies;
-    private String clinicName;
+    private Long clinicId;
     private String region;
 }
+

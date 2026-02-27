@@ -55,7 +55,7 @@ public abstract class BaseIntegrationTest {
         RegisterRequest request = RegisterRequest.builder()
                 .name(name)
                 .role("Doctor")
-                .clinicName("Test Clinic")
+                .clinicRegistrationCode(null)
                 .region("Test Region")
                 .email(email)
                 .password(password)

@@ -2,9 +2,11 @@ package com.asakaa.synthesis.service;
 
 import com.asakaa.synthesis.domain.dto.request.PatientRequest;
 import com.asakaa.synthesis.domain.dto.response.PatientResponse;
+import com.asakaa.synthesis.domain.entity.Clinic;
 import com.asakaa.synthesis.domain.entity.Patient;
 import com.asakaa.synthesis.exception.ResourceNotFoundException;
 import com.asakaa.synthesis.exception.ValidationException;
+import com.asakaa.synthesis.repository.ClinicRepository;
 import com.asakaa.synthesis.repository.PatientRepository;
 import com.asakaa.synthesis.util.PatientMapper;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class PatientService {
 
     private final PatientRepository patientRepository;
+    private final ClinicRepository clinicRepository;
     private final PatientMapper patientMapper;
 
     @Transactional
@@ -66,7 +69,12 @@ public class PatientService {
         patient.setGender(request.getGender());
         patient.setBloodGroup(request.getBloodGroup());
         patient.setAllergies(request.getAllergies());
-        patient.setClinicName(request.getClinicName());
+
+        if (request.getClinicId() != null) {
+            Clinic clinic = clinicRepository.findById(request.getClinicId()).orElse(null);
+            patient.setClinic(clinic);
+        }
+
         patient.setRegion(request.getRegion());
 
         patient = patientRepository.save(patient);

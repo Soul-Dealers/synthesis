@@ -92,12 +92,12 @@ public class AnalyticsService {
                 .collect(Collectors.toList());
     }
 
-    public Map<String, Object> getClinicSummary(String clinicName) {
-        log.info("Fetching clinic summary for: {}", clinicName);
+    public Map<String, Object> getClinicSummary(Long clinicId) {
+        log.info("Fetching clinic summary for clinic id: {}", clinicId);
 
         Map<String, Object> summary = new HashMap<>();
 
-        List<Long> patientIds = patientRepository.findByClinicName(clinicName).stream()
+        List<Long> patientIds = patientRepository.findByClinicId(clinicId).stream()
                 .map(BaseEntity::getId)
                 .toList();
 

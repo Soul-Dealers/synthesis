@@ -34,7 +34,7 @@ class PatientApiIntegrationTest extends BaseIntegrationTest {
                 .dateOfBirth(LocalDate.of(1990, 1, 1))
                 .gender("Male")
                 .bloodGroup("O+")
-                .clinicName("Test Clinic")
+                .clinicId(null)
                 .build();
 
         HttpEntity<PatientRequest> entity = createAuthEntity(request, authToken);

@@ -107,7 +107,7 @@ public class EscalationService {
         summary.append(String.format("- Gender: %s\n", patient.getGender() != null ? patient.getGender() : "Not specified"));
         summary.append(String.format("- Blood Group: %s\n", patient.getBloodGroup() != null ? patient.getBloodGroup() : "Not specified"));
         summary.append(String.format("- Allergies: %s\n", patient.getAllergies() != null ? patient.getAllergies() : "None reported"));
-        summary.append(String.format("- Clinic: %s\n\n", patient.getClinicName() != null ? patient.getClinicName() : "Not specified"));
+        summary.append(String.format("- Clinic: %s\n\n", patient.getClinic() != null ? patient.getClinic().getName() : "Not specified"));
 
         summary.append("CONSULTATION DETAILS:\n");
         summary.append(String.format("- Chief Complaint: %s\n", consultation.getChiefComplaint()));

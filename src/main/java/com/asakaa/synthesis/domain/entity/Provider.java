@@ -23,8 +23,9 @@ public class Provider extends BaseEntity {
     @Column(nullable = false)
     private String role;
 
-    @Column(name = "clinic_name")
-    private String clinicName;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "clinic_id")
+    private Clinic clinic;
 
     private String region;
 
@@ -38,3 +39,4 @@ public class Provider extends BaseEntity {
     @Builder.Default
     private List<Consultation> consultations = new ArrayList<>();
 }
+

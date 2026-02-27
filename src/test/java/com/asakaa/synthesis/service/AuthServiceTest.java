@@ -5,6 +5,7 @@ import com.asakaa.synthesis.domain.dto.request.RegisterRequest;
 import com.asakaa.synthesis.domain.dto.response.AuthResponse;
 import com.asakaa.synthesis.domain.entity.Provider;
 import com.asakaa.synthesis.exception.ValidationException;
+import com.asakaa.synthesis.repository.ClinicRepository;
 import com.asakaa.synthesis.repository.ProviderRepository;
 import com.asakaa.synthesis.util.JwtUtil;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,6 +30,9 @@ class AuthServiceTest {
     private ProviderRepository providerRepository;
 
     @Mock
+    private ClinicRepository clinicRepository;
+
+    @Mock
     private PasswordEncoder passwordEncoder;
 
     @Mock
@@ -46,7 +50,7 @@ class AuthServiceTest {
         registerRequest = RegisterRequest.builder()
                 .name("Dr. Smith")
                 .role("Doctor")
-                .clinicName("City Clinic")
+                .clinicRegistrationCode(null)
                 .region("North")
                 .email("smith@example.com")
                 .password("password123")

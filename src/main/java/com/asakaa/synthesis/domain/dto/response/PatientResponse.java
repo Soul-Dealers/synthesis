@@ -22,7 +22,9 @@ public class PatientResponse {
     private String gender;
     private String bloodGroup;
     private String allergies;
+    private Long clinicId;
     private String clinicName;
     private String region;
     private LocalDateTime createdAt;
 }
+

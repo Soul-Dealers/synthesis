@@ -34,9 +34,9 @@ public class AnalyticsController {
         return ResponseEntity.ok(response);
     }
 
-    @GetMapping("/clinic/{clinicName}")
-    public ResponseEntity<Map<String, Object>> getClinicSummary(@PathVariable String clinicName) {
-        Map<String, Object> response = analyticsService.getClinicSummary(clinicName);
+    @GetMapping("/clinic/{clinicId}")
+    public ResponseEntity<Map<String, Object>> getClinicSummary(@PathVariable Long clinicId) {
+        Map<String, Object> response = analyticsService.getClinicSummary(clinicId);
         return ResponseEntity.ok(response);
     }
 

@@ -14,10 +14,11 @@ public interface PatientRepository extends JpaRepository<Patient, Long> {
 
     Optional<Patient> findByNationalId(String nationalId);
 
-    List<Patient> findByClinicName(String clinicName);
+    List<Patient> findByClinicId(Long clinicId);
 
     boolean existsByNationalId(String nationalId);
 
     Page<Patient> findByFirstNameContainingIgnoreCaseOrLastNameContainingIgnoreCase(
             String firstName, String lastName, Pageable pageable);
 }
+

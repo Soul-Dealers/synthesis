@@ -36,8 +36,9 @@ public class Patient extends BaseEntity {
     @Column(columnDefinition = "TEXT")
     private String allergies;
 
-    @Column(name = "clinic_name")
-    private String clinicName;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "clinic_id")
+    private Clinic clinic;
 
     private String region;
 
@@ -45,3 +46,4 @@ public class Patient extends BaseEntity {
     @Builder.Default
     private List<Consultation> consultations = new ArrayList<>();
 }
+

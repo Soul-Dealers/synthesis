@@ -13,8 +13,9 @@ public class RegisterRequest {
 
     private String name;
     private String role;
-    private String clinicName;
+    private String clinicRegistrationCode;
     private String region;
     private String email;
     private String password;
 }
+

@@ -3,8 +3,10 @@ package com.asakaa.synthesis.service;
 import com.asakaa.synthesis.domain.dto.request.AuthRequest;
 import com.asakaa.synthesis.domain.dto.request.RegisterRequest;
 import com.asakaa.synthesis.domain.dto.response.AuthResponse;
+import com.asakaa.synthesis.domain.entity.Clinic;
 import com.asakaa.synthesis.domain.entity.Provider;
 import com.asakaa.synthesis.exception.ValidationException;
+import com.asakaa.synthesis.repository.ClinicRepository;
 import com.asakaa.synthesis.repository.ProviderRepository;
 import com.asakaa.synthesis.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class AuthService {
 
     private final ProviderRepository providerRepository;
+    private final ClinicRepository clinicRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
 
@@ -26,10 +29,17 @@ public class AuthService {
             throw new ValidationException("Email already registered");
         }
 
+        // Look up clinic by registration code
+        Clinic clinic = null;
+        if (request.getClinicRegistrationCode() != null && !request.getClinicRegistrationCode().isBlank()) {
+            clinic = clinicRepository.findByRegistrationCode(request.getClinicRegistrationCode())
+                    .orElseThrow(() -> new ValidationException("Invalid clinic registration code"));
+        }
+
         Provider provider = Provider.builder()
                 .name(request.getName())
                 .role(request.getRole())
-                .clinicName(request.getClinicName())
+                .clinic(clinic)
                 .region(request.getRegion())
                 .email(request.getEmail())
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
@@ -39,12 +49,19 @@ public class AuthService {
 
         String token = jwtUtil.generateToken(provider.getEmail());
 
-        return AuthResponse.builder()
+        AuthResponse.AuthResponseBuilder responseBuilder = AuthResponse.builder()
                 .token(token)
                 .email(provider.getEmail())
                 .name(provider.getName())
-                .role(provider.getRole())
-                .build();
+                .role(provider.getRole());
+
+        if (clinic != null) {
+            responseBuilder
+                    .clinicId(clinic.getId())
+                    .clinicName(clinic.getName());
+        }
+
+        return responseBuilder.build();
     }
 
     public AuthResponse login(AuthRequest request) {
@@ -57,11 +74,19 @@ public class AuthService {
 
         String token = jwtUtil.generateToken(provider.getEmail());
 
-        return AuthResponse.builder()
+        AuthResponse.AuthResponseBuilder responseBuilder = AuthResponse.builder()
                 .token(token)
                 .email(provider.getEmail())
                 .name(provider.getName())
-                .role(provider.getRole())
-                .build();
+                .role(provider.getRole());
+
+        if (provider.getClinic() != null) {
+            responseBuilder
+                    .clinicId(provider.getClinic().getId())
+                    .clinicName(provider.getClinic().getName());
+        }
+
+        return responseBuilder.build();
     }
 }
+

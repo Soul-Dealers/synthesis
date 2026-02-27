@@ -2,13 +2,24 @@ package com.asakaa.synthesis.util;
 
 import com.asakaa.synthesis.domain.dto.request.PatientRequest;
 import com.asakaa.synthesis.domain.dto.response.PatientResponse;
+import com.asakaa.synthesis.domain.entity.Clinic;
 import com.asakaa.synthesis.domain.entity.Patient;
+import com.asakaa.synthesis.repository.ClinicRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 @Component
+@RequiredArgsConstructor
 public class PatientMapper {
 
+    private final ClinicRepository clinicRepository;
+
     public Patient toEntity(PatientRequest request) {
+        Clinic clinic = null;
+        if (request.getClinicId() != null) {
+            clinic = clinicRepository.findById(request.getClinicId()).orElse(null);
+        }
+
         return Patient.builder()
                 .nationalId(request.getNationalId())
                 .firstName(request.getFirstName())
@@ -17,7 +28,7 @@ public class PatientMapper {
                 .gender(request.getGender())
                 .bloodGroup(request.getBloodGroup())
                 .allergies(request.getAllergies())
-                .clinicName(request.getClinicName())
+                .clinic(clinic)
                 .region(request.getRegion())
                 .build();
     }
@@ -32,9 +43,11 @@ public class PatientMapper {
                 .gender(patient.getGender())
                 .bloodGroup(patient.getBloodGroup())
                 .allergies(patient.getAllergies())
-                .clinicName(patient.getClinicName())
+                .clinicId(patient.getClinic() != null ? patient.getClinic().getId() : null)
+                .clinicName(patient.getClinic() != null ? patient.getClinic().getName() : null)
                 .region(patient.getRegion())
                 .createdAt(patient.getCreatedAt())
                 .build();
     }
 }
+
