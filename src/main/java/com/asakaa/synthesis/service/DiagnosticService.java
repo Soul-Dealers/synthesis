@@ -24,10 +24,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.asakaa.synthesis.domain.dto.PatientHistoryTimeline;
+import com.asakaa.synthesis.domain.dto.PatientHistoryTimelineEvent;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.Period;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 @Slf4j
@@ -211,6 +216,115 @@ public class DiagnosticService {
                 .labResults(labResultsText)
                 .imagingFindings(imagingFindingsText)
                 .build();
+    }
+
+    PatientHistoryTimeline buildPatientHistoryTimeline(Patient patient) {
+        LocalDateTime sixMonthsAgo = LocalDateTime.now().minusMonths(6);
+        List<Consultation> pastConsultations = consultationRepository
+                .findByPatientIdAndOpenedAtAfterOrderByOpenedAtAsc(patient.getId(), sixMonthsAgo);
+
+        List<PatientHistoryTimelineEvent> events = new ArrayList<>();
+        int totalConsultations = 0;
+        int totalDiagnoses = 0;
+        int totalLabResults = 0;
+        int totalImagingFindings = 0;
+
+        for (Consultation consultation : pastConsultations) {
+            String consultationIdStr = String.valueOf(consultation.getId());
+            totalConsultations++;
+
+            events.add(PatientHistoryTimelineEvent.builder()
+                    .eventDate(consultation.getOpenedAt())
+                    .eventType("CONSULTATION")
+                    .description("Consultation: " + consultation.getChiefComplaint())
+                    .consultationId(consultationIdStr)
+                    .details("Chief complaint: " + consultation.getChiefComplaint())
+                    .build());
+
+            if (consultation.getDiagnoses() != null) {
+                for (Diagnosis diagnosis : consultation.getDiagnoses()) {
+                    totalDiagnoses++;
+                    events.add(PatientHistoryTimelineEvent.builder()
+                            .eventDate(consultation.getOpenedAt())
+                            .eventType("DIAGNOSIS")
+                            .description("Diagnosis: " + diagnosis.getConditionName()
+                                    + " (confidence: " + diagnosis.getConfidenceScore() + ")")
+                            .consultationId(consultationIdStr)
+                            .details("Reasoning: " + diagnosis.getReasoning())
+                            .build());
+                }
+            }
+
+            if (consultation.getLabResults() != null) {
+                for (LabResult lab : consultation.getLabResults()) {
+                    totalLabResults++;
+                    events.add(PatientHistoryTimelineEvent.builder()
+                            .eventDate(lab.getRecordedAt())
+                            .eventType("LAB_RESULT")
+                            .description("Lab: " + lab.getTestName() + " = " + lab.getNumericValue()
+                                    + " " + (lab.getUnit() != null ? lab.getUnit() : ""))
+                            .consultationId(consultationIdStr)
+                            .details((lab.getIsAbnormal() != null && lab.getIsAbnormal() ? "ABNORMAL" : "Normal")
+                                    + (lab.getReferenceRange() != null ? ", Ref: " + lab.getReferenceRange() : ""))
+                            .build());
+                }
+            }
+
+            if (consultation.getImageAnalyses() != null) {
+                for (ImageAnalysis analysis : consultation.getImageAnalyses()) {
+                    totalImagingFindings++;
+                    events.add(PatientHistoryTimelineEvent.builder()
+                            .eventDate(analysis.getAnalyzedAt())
+                            .eventType("IMAGING")
+                            .description("Imaging: " + analysis.getDescription())
+                            .consultationId(consultationIdStr)
+                            .details("Findings: " + (analysis.getFindings() != null
+                                    ? String.join(", ", analysis.getFindings()) : "None"))
+                            .build());
+                }
+            }
+        }
+
+        events.sort(Comparator.comparing(PatientHistoryTimelineEvent::getEventDate));
+
+        return PatientHistoryTimeline.builder()
+                .patientId(String.valueOf(patient.getId()))
+                .timeframePeriod("6 months")
+                .events(events)
+                .totalConsultations(totalConsultations)
+                .totalDiagnoses(totalDiagnoses)
+                .totalLabResults(totalLabResults)
+                .totalImagingFindings(totalImagingFindings)
+                .build();
+    }
+
+    String formatPatientHistoryForPrompt(PatientHistoryTimeline timeline) {
+        if (timeline.getEvents() == null || timeline.getEvents().isEmpty()) {
+            return "No consultation history available for the past 6 months.";
+        }
+
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+        StringBuilder sb = new StringBuilder();
+
+        sb.append("=== PATIENT HISTORY (Past ").append(timeline.getTimeframePeriod()).append(") ===\n");
+        sb.append("Summary: ")
+                .append(timeline.getTotalConsultations()).append(" consultation(s), ")
+                .append(timeline.getTotalDiagnoses()).append(" diagnosis/diagnoses, ")
+                .append(timeline.getTotalLabResults()).append(" lab result(s), ")
+                .append(timeline.getTotalImagingFindings()).append(" imaging finding(s)\n\n");
+        sb.append("Chronological Timeline:\n");
+
+        for (PatientHistoryTimelineEvent event : timeline.getEvents()) {
+            sb.append("- [").append(event.getEventDate().format(formatter)).append("] ");
+            sb.append("[").append(event.getEventType()).append("] ");
+            sb.append(event.getDescription());
+            if (event.getDetails() != null && !event.getDetails().isEmpty()) {
+                sb.append("\n  ").append(event.getDetails());
+            }
+            sb.append("\n");
+        }
+
+        return sb.toString();
     }
 
     private boolean responseContainsKey(String rawResponse, String key) {
