@@ -14,4 +14,5 @@ public class ClinicalContext {
     private String localFormulary;
     private String labResults;
     private String imagingFindings;
+    private String patientHistory;
 }

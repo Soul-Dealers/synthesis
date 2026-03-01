@@ -207,6 +207,9 @@ public class DiagnosticService {
             imagingFindingsText = sb.toString();
         }
 
+        PatientHistoryTimeline patientHistory = buildPatientHistoryTimeline(patient);
+        String historyFormatted = formatPatientHistoryForPrompt(patientHistory);
+
         return ClinicalContext.builder()
                 .patientSummary(patientSummary)
                 .chiefComplaint(consultation.getChiefComplaint())
@@ -215,6 +218,7 @@ public class DiagnosticService {
                 .localFormulary(formulary)
                 .labResults(labResultsText)
                 .imagingFindings(imagingFindingsText)
+                .patientHistory(historyFormatted)
                 .build();
     }
 
