@@ -13,7 +13,10 @@ public class BedrockPromptBuilder {
                 
                 PATIENT INFORMATION:
                 %s
-                
+
+                PATIENT MEDICAL HISTORY (PAST 6 MONTHS):
+                %s
+
                 CHIEF COMPLAINT:
                 %s
                 
@@ -34,14 +37,15 @@ public class BedrockPromptBuilder {
                 
                 INSTRUCTIONS:
                 1. Generate a ranked differential diagnosis based on the clinical presentation
-                2. Adapt all recommendations to the available equipment: %s
-                3. Suggest only medications from the local formulary: %s
-                4. Prioritize life-threatening conditions and red flags
-                5. Consider common conditions in underserved/resource-limited settings
-                6. Provide clear clinical reasoning for each differential
-                7. Suggest 3-5 HIGH-YIELD CLINICAL QUESTIONS the provider should ask the patient to narrow the diagnosis
-                8. Suggest 2-4 PHYSICAL EXAMINATIONS the provider should perform next with their available equipment
-                9. Rate the overall urgency: LOW, MODERATE, HIGH, or CRITICAL
+                2. Consider the patient's medical history — look for recurring conditions, disease progression, and prior treatment outcomes
+                3. Adapt all recommendations to the available equipment: %s
+                4. Suggest only medications from the local formulary: %s
+                5. Prioritize life-threatening conditions and red flags
+                6. Consider common conditions in underserved/resource-limited settings
+                7. Provide clear clinical reasoning for each differential
+                8. Suggest 3-5 HIGH-YIELD CLINICAL QUESTIONS the provider should ask the patient to narrow the diagnosis
+                9. Suggest 2-4 PHYSICAL EXAMINATIONS the provider should perform next with their available equipment
+                10. Rate the overall urgency: LOW, MODERATE, HIGH, or CRITICAL
                 
                 Return your response as a valid JSON object with this EXACT structure:
                 {
@@ -70,6 +74,7 @@ public class BedrockPromptBuilder {
                 Ensure confidence scores are between 0.0 and 1.0. Return ONLY the JSON object, no additional text.
                 """,
                 context.getPatientSummary() != null ? context.getPatientSummary() : "Not provided",
+                context.getPatientHistory() != null ? context.getPatientHistory() : "No consultation history available for the past 6 months.",
                 context.getChiefComplaint() != null ? context.getChiefComplaint() : "Not provided",
                 context.getVitals() != null ? context.getVitals() : "Not recorded",
                 context.getLabResults() != null ? context.getLabResults() : "None provided",
