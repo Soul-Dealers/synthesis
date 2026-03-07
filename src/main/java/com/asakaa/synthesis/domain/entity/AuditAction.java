@@ -45,5 +45,13 @@ public enum AuditAction {
     
     // Admin Actions
     VIEW_AUDIT_LOGS,
-    EXPORT_AUDIT_LOGS
+    EXPORT_AUDIT_LOGS,
+    
+    // Referral Actions
+    CREATE_REFERRAL,
+    ACCEPT_REFERRAL,
+    COMPLETE_REFERRAL,
+    CANCEL_REFERRAL,
+    REVOKE_ACCESS_GRANT,
+    ACCESS_VIA_REFERRAL
 }

@@ -7,6 +7,15 @@ This guide provides complete details for testing the patient consultation histor
 
 ## API Endpoint Details
 
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/api/v1/consultations` | Create consultation |
+| GET | `/api/v1/consultations/patient/{patientId}/history` | Get patient history |
+| POST | `/api/v1/referrals` | Create patient referral |
+| PUT | `/api/v1/referrals/{id}/accept` | Accept referral |
+| GET | `/api/v1/audit` | View all audit logs (Super Admin) |
+| GET | `/api/v1/audit/patient/{id}` | View patient specific logs (Super Admin) |
+
 ### Get Patient Consultation History
 
 **Endpoint**: `GET /api/v1/consultations/patient/{patientId}/history`
@@ -277,6 +286,43 @@ The system automatically records security and clinical events in the background.
 **Headers**: `Authorization: Bearer <SUPER_ADMIN_TOKEN>`
 
 **Expected Result**: Shows failed login attempts or unauthorized access violations (e.g., the `403` triggered in Scenario 1).
+
+---
+
+## Secure Patient Referral System
+
+This feature allows Clinic A to refer a patient to Clinic B, granting Clinic B temporary access to the patient's full medical history.
+
+### Step 9: Create a Referral (Clinic A -> Clinic B)
+**Method**: `POST`  
+**URL**: `http://localhost:8080/api/v1/referrals`  
+**Headers**: `Authorization: Bearer <CLINIC_A_TOKEN>`  
+**Body**:
+```json
+{
+  "patientId": 1,
+  "receivingClinicId": 2,
+  "reason": "Specialist consultation for respiratory issues",
+  "notes": "Patient has persistent cough, needs evaluation by pulmonologist",
+  "accessDurationDays": 14
+}
+```
+
+**Expected Result**: `201 Created` with a referral `id`. The status is `PENDING`.
+
+### Step 10: Accept the Referral (Clinic B)
+**Method**: `PUT`  
+**URL**: `http://localhost:8080/api/v1/referrals/{referralId}/accept`  
+**Headers**: `Authorization: Bearer <CLINIC_B_TOKEN>`
+
+**Expected Result**: `200 OK`. The status changes to `ACCEPTED`. At this moment, an `AccessGrant` is created, allowing Clinic B to view the patient.
+
+### Step 11: Verify Cross-Clinic Access
+**Method**: `GET`  
+**URL**: `http://localhost:8080/api/v1/consultations/patient/1/history`  
+**Headers**: `Authorization: Bearer <CLINIC_B_TOKEN>`
+
+**Expected Result**: `200 OK`. Clinic B can now see the history that was previously blocked with a `403`.
 
 ---
 
